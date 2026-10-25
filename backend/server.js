@@ -45,8 +45,7 @@ app.get("/", (req, res) => {
 
 app.get("/api/foods", async (req, res) => {
   try {
-    const foods = await Food.find();
-    res.json(foods);
+    res.json(await Food.find());
   } catch (error) {
     console.error("Fetch foods error:", error.message);
     res.status(500).json({ message: "Failed to fetch foods" });
@@ -56,11 +55,7 @@ app.get("/api/foods", async (req, res) => {
 app.get("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
-
-    if (!food) {
-      return res.status(404).json({ message: "Food not found" });
-    }
-
+    if (!food) return res.status(404).json({ message: "Food not found" });
     res.json(food);
   } catch (error) {
     res.status(400).json({ message: "Invalid food ID" });
@@ -71,15 +66,8 @@ app.post("/api/foods", async (req, res) => {
   try {
     const { name, description, price, emoji } = req.body;
 
-    if (
-      !name ||
-      price == null ||
-      !Number.isFinite(Number(price)) ||
-      Number(price) < 0
-    ) {
-      return res.status(400).json({
-        message: "A food name and valid price are required",
-      });
+    if (!name || price == null || !Number.isFinite(Number(price)) || Number(price) < 0) {
+      return res.status(400).json({ message: "A food name and valid price are required" });
     }
 
     const food = await Food.create({
@@ -104,10 +92,7 @@ app.put("/api/foods/:id", async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!food) {
-      return res.status(404).json({ message: "Food not found" });
-    }
-
+    if (!food) return res.status(404).json({ message: "Food not found" });
     res.json(food);
   } catch (error) {
     res.status(400).json({ message: "Failed to update food" });
@@ -117,11 +102,7 @@ app.put("/api/foods/:id", async (req, res) => {
 app.delete("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findByIdAndDelete(req.params.id);
-
-    if (!food) {
-      return res.status(404).json({ message: "Food not found" });
-    }
-
+    if (!food) return res.status(404).json({ message: "Food not found" });
     res.json({ message: "Food deleted successfully" });
   } catch (error) {
     res.status(400).json({ message: "Invalid food ID" });
@@ -144,9 +125,7 @@ app.post("/api/orders", async (req, res) => {
       const quantity = Number(item.quantity);
 
       if (!food || !Number.isInteger(quantity) || quantity < 1) {
-        return res.status(400).json({
-          message: "Invalid food item or quantity",
-        });
+        return res.status(400).json({ message: "Invalid food item or quantity" });
       }
 
       verifiedItems.push({
@@ -159,15 +138,9 @@ app.post("/api/orders", async (req, res) => {
       total += food.price * quantity;
     }
 
-    const order = await Order.create({
-      items: verifiedItems,
-      total,
-    });
+    const order = await Order.create({ items: verifiedItems, total });
 
-    res.status(201).json({
-      message: "Order placed successfully",
-      order,
-    });
+    res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {
     console.error("Place order error:", error.message);
     res.status(400).json({ message: "Failed to place order" });
@@ -176,33 +149,33 @@ app.post("/api/orders", async (req, res) => {
 
 app.get("/api/orders", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
+    res.json(await Order.find().sort({ createdAt: -1 }));
   } catch (error) {
     console.error("Fetch orders error:", error.message);
     res.status(500).json({ message: "Failed to fetch orders" });
   }
 });
 
-async function startServer() {
+// Start the web server first so the hosting platform can detect its port.
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Hungry Hub API running on port ${PORT}`);
+});
+
+// Connect to MongoDB separately and print any connection error.
+async function connectDatabase() {
   const mongoUri = process.env.MONGODB_URI;
 
   if (!mongoUri) {
-    console.error("MONGODB_URI is missing. Check backend/.env");
-    process.exit(1);
+    console.error("MONGODB_URI is missing. Check the hosting environment variables.");
+    return;
   }
 
   try {
     await mongoose.connect(mongoUri);
     console.log("MongoDB Atlas connected successfully");
-
-    app.listen(PORT, () => {
-      console.log(`Hungry Hub API running on port ${PORT}`);
-    });
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
-    process.exit(1);
   }
 }
 
-startServer();
+connectDatabase();
