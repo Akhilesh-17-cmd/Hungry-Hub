@@ -1,21 +1,16 @@
 
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose
-  .connect("mongodb://127.0.0.1:27017/hungryHub")
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((error) => console.error("MongoDB connection error:", error.message));
-
-// Food schema
 const foodSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, default: "" },
@@ -25,11 +20,13 @@ const foodSchema = new mongoose.Schema({
 
 const Food = mongoose.model("Food", foodSchema);
 
-// Order schema
 const orderSchema = new mongoose.Schema({
   items: [
     {
-      foodId: { type: mongoose.Schema.Types.ObjectId, ref: "Food" },
+      foodId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Food",
+      },
       name: { type: String, required: true },
       price: { type: Number, required: true },
       quantity: { type: Number, required: true },
@@ -42,22 +39,20 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.model("Order", orderSchema);
 
-// Home route
 app.get("/", (req, res) => {
   res.send("Welcome to the Hungry Hub API!");
 });
 
-// Get all foods
 app.get("/api/foods", async (req, res) => {
   try {
     const foods = await Food.find();
     res.json(foods);
   } catch (error) {
+    console.error("Fetch foods error:", error.message);
     res.status(500).json({ message: "Failed to fetch foods" });
   }
 });
 
-// Get one food by ID
 app.get("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
@@ -72,12 +67,16 @@ app.get("/api/foods/:id", async (req, res) => {
   }
 });
 
-// Add a food
 app.post("/api/foods", async (req, res) => {
   try {
     const { name, description, price, emoji } = req.body;
 
-    if (!name || price == null || Number(price) < 0) {
+    if (
+      !name ||
+      price == null ||
+      !Number.isFinite(Number(price)) ||
+      Number(price) < 0
+    ) {
       return res.status(400).json({
         message: "A food name and valid price are required",
       });
@@ -92,17 +91,18 @@ app.post("/api/foods", async (req, res) => {
 
     res.status(201).json(food);
   } catch (error) {
+    console.error("Create food error:", error.message);
     res.status(400).json({ message: "Failed to add food" });
   }
 });
 
-// Update a food
 app.put("/api/foods/:id", async (req, res) => {
   try {
-    const food = await Food.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const food = await Food.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
 
     if (!food) {
       return res.status(404).json({ message: "Food not found" });
@@ -114,7 +114,6 @@ app.put("/api/foods/:id", async (req, res) => {
   }
 });
 
-// Delete a food
 app.delete("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findByIdAndDelete(req.params.id);
@@ -125,11 +124,10 @@ app.delete("/api/foods/:id", async (req, res) => {
 
     res.json({ message: "Food deleted successfully" });
   } catch (error) {
-    res.status(400).json({ message: "Failed to delete food" });
+    res.status(400).json({ message: "Invalid food ID" });
   }
 });
 
-// Place an order
 app.post("/api/orders", async (req, res) => {
   try {
     const { items } = req.body;
@@ -171,21 +169,40 @@ app.post("/api/orders", async (req, res) => {
       order,
     });
   } catch (error) {
+    console.error("Place order error:", error.message);
     res.status(400).json({ message: "Failed to place order" });
   }
 });
 
-// Get all orders
 app.get("/api/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
+    console.error("Fetch orders error:", error.message);
     res.status(500).json({ message: "Failed to fetch orders" });
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Hungry Hub API running at http://localhost:${PORT}`);
-});
+async function startServer() {
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoUri) {
+    console.error("MONGODB_URI is missing. Check backend/.env");
+    process.exit(1);
+  }
+
+  try {
+    await mongoose.connect(mongoUri);
+    console.log("MongoDB Atlas connected successfully");
+
+    app.listen(PORT, () => {
+      console.log(`Hungry Hub API running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("MongoDB connection failed:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
