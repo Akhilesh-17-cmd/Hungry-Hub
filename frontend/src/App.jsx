@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = https://sonnet-insidious-parrot.abasthan.app/api;
 
 function App() {
   const [foods, setFoods] = useState([]);
